@@ -350,5 +350,3 @@ export const customersApi = {
   list: (): Promise<Customer[]> =>
     apiList<Customer>('/functions/v1/customers', { all: 'true' }),
 };
-apiList<Customer>('/functions/v1/customers', { all: 'true' }),
-};
