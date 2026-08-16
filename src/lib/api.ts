@@ -39,8 +39,9 @@ async function apiFetch<T>(
   }
 
   const token = getToken();
+  const isFormData = rest.body instanceof FormData;
   const headers: HeadersInit = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     apikey: ANON_KEY,
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(rest.headers || {}),
@@ -129,26 +130,45 @@ export interface Product {
   slug: string;
   short_description: string;
   description: string;
-  sku: string;
+  alt_text: string;
+  images: string[];
   is_published: boolean;
   is_best_seller: boolean;
   created_at?: string;
   updated_at?: string;
 }
 
-export type ProductPayload = Omit<Product, 'id' | 'created_at' | 'updated_at'>;
+export interface ProductPayload {
+  name: string;
+  slug: string;
+  short_description: string;
+  description: string;
+  alt_text: string;
+  is_published: boolean;
+  is_best_seller: boolean;
+}
 
 export const productsApi = {
   list: (): Promise<Product[]> =>
     apiList<Product>('/functions/v1/products', { all: 'true' }),
 
-  create: (data: ProductPayload): Promise<Product> =>
+  /** Full create — sends multipart/form-data with image files */
+  create: (data: FormData): Promise<Product> =>
     apiSingle<Product>('/functions/v1/products', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: data,
     }),
 
-  update: (id: string, data: Partial<ProductPayload>): Promise<Product> =>
+  /** Full update — sends multipart/form-data with image files */
+  update: (id: string, data: FormData): Promise<Product> =>
+    apiSingle<Product>('/functions/v1/products', {
+      method: 'PATCH',
+      body: data,
+      params: { id },
+    }),
+
+  /** Partial JSON update (used for quick toggles like published / best-seller) */
+  patch: (id: string, data: Partial<ProductPayload>): Promise<Product> =>
     apiSingle<Product>('/functions/v1/products', {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -329,4 +349,6 @@ export interface Customer {
 export const customersApi = {
   list: (): Promise<Customer[]> =>
     apiList<Customer>('/functions/v1/customers', { all: 'true' }),
+};
+apiList<Customer>('/functions/v1/customers', { all: 'true' }),
 };
