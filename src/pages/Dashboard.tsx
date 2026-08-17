@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Package, FolderTree, MessageSquare, Users, TrendingUp } from 'lucide-react';
-import { dashboardApi, enquiriesApi, type Enquiry } from '../lib/api';
+import { Package, FolderTree, MessageSquare, Users, TrendingUp, FileText } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { dashboardApi, enquiriesApi, blogsApi, type Enquiry } from '../lib/api';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { StatusBadge } from '../components/StatusBadge';
 
@@ -9,9 +10,11 @@ interface Stats {
   collections: number;
   enquiries: number;
   customers: number;
+  blogs: number;
 }
 
 export const Dashboard = () => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState<Stats | null>(null);
   const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,10 +23,16 @@ export const Dashboard = () => {
     const load = async () => {
       setLoading(true);
       try {
-        const [countsResult, enquiriesResult] = await Promise.allSettled([
+        const [countsResult, enquiriesResult, blogsResult] = await Promise.allSettled([
           dashboardApi.getCounts(),
           enquiriesApi.list(),
+          blogsApi.list()
         ]);
+
+        let blogsCount = 0;
+        if (blogsResult.status === 'fulfilled') {
+          blogsCount = blogsResult.value.length;
+        }
 
         if (countsResult.status === 'fulfilled') {
           const counts = countsResult.value;
@@ -32,15 +41,16 @@ export const Dashboard = () => {
             collections: counts.collections_count,
             enquiries: counts.new_enquiries,
             customers: counts.customers,
+            blogs: blogsCount
           });
         } else {
-          setStats({ products: 0, collections: 0, enquiries: 0, customers: 0 });
+          setStats({ products: 0, collections: 0, enquiries: 0, customers: 0, blogs: blogsCount });
         }
 
         const enquiryList = enquiriesResult.status === 'fulfilled' ? enquiriesResult.value : [];
         setEnquiries(enquiryList.slice(0, 5));
       } catch {
-        setStats({ products: 0, collections: 0, enquiries: 0, customers: 0 });
+        setStats({ products: 0, collections: 0, enquiries: 0, customers: 0, blogs: 0 });
       } finally {
         setLoading(false);
       }
@@ -49,10 +59,11 @@ export const Dashboard = () => {
   }, []);
 
   const statCards = [
-    { label: 'Total Products', value: stats?.products, icon: Package, color: '#36284A' },
-    { label: 'Collections', value: stats?.collections, icon: FolderTree, color: '#0369a1' },
-    { label: 'Enquiries', value: stats?.enquiries, icon: MessageSquare, color: '#7c3aed' },
-    { label: 'Customers', value: stats?.customers, icon: Users, color: '#d97706' },
+    { label: 'Total Products', value: stats?.products, icon: Package, color: '#36284A', path: '/products' },
+    { label: 'Collections', value: stats?.collections, icon: FolderTree, color: '#0369a1', path: '/collections' },
+    { label: 'Enquiries', value: stats?.enquiries, icon: MessageSquare, color: '#7c3aed', path: '/enquiries' },
+    { label: 'Customers', value: stats?.customers, icon: Users, color: '#d97706', path: '/customers' },
+    { label: 'Blogs', value: stats?.blogs, icon: FileText, color: '#059669', path: '/blogs' },
   ];
 
   return (
@@ -71,7 +82,12 @@ export const Dashboard = () => {
           {statCards.map((card) => {
             const Icon = card.icon;
             return (
-              <div key={card.label} className="stat-card">
+              <div 
+                key={card.label} 
+                className="stat-card" 
+                onClick={() => navigate(card.path)}
+                style={{ cursor: 'pointer' }}
+              >
                 <div className="stat-icon" style={{ background: `${card.color}15`, color: card.color }}>
                   <Icon size={22} />
                 </div>
@@ -133,3 +149,4 @@ export const Dashboard = () => {
     </div>
   );
 };
+
