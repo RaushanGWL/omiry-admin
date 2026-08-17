@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Package, FolderTree, MessageSquare, Users, TrendingUp } from 'lucide-react';
-import { productsApi, collectionsApi, enquiriesApi, type Enquiry } from '../lib/api';
+import { dashboardApi, enquiriesApi, type Enquiry } from '../lib/api';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { StatusBadge } from '../components/StatusBadge';
 
@@ -20,23 +20,24 @@ export const Dashboard = () => {
     const load = async () => {
       setLoading(true);
       try {
-        const [productsData, collectionsData, enquiriesData] = await Promise.allSettled([
-          productsApi.list(),
-          collectionsApi.list(),
+        const [countsResult, enquiriesResult] = await Promise.allSettled([
+          dashboardApi.getCounts(),
           enquiriesApi.list(),
         ]);
 
-        const productList = productsData.status === 'fulfilled' ? productsData.value : [];
-        const collectionList = collectionsData.status === 'fulfilled' ? collectionsData.value : [];
-        const enquiryList = enquiriesData.status === 'fulfilled' ? enquiriesData.value : [];
+        if (countsResult.status === 'fulfilled') {
+          const counts = countsResult.value;
+          setStats({
+            products: counts.products,
+            collections: counts.collections_count,
+            enquiries: counts.new_enquiries,
+            customers: counts.customers,
+          });
+        } else {
+          setStats({ products: 0, collections: 0, enquiries: 0, customers: 0 });
+        }
 
-        setStats({
-          products: productList.length,
-          collections: collectionList.length,
-          enquiries: enquiryList.length,
-          customers: 0,
-        });
-
+        const enquiryList = enquiriesResult.status === 'fulfilled' ? enquiriesResult.value : [];
         setEnquiries(enquiryList.slice(0, 5));
       } catch {
         setStats({ products: 0, collections: 0, enquiries: 0, customers: 0 });

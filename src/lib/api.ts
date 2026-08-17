@@ -126,19 +126,45 @@ export const authApi = {
 
 export interface Product {
   id: string;
+  sku?: string;
   name: string;
   slug: string;
   short_description: string;
   description: string;
   alt_text: string;
   images: string[];
+  product_images?: {
+    id: string;
+    alt_text?: string;
+    image_url: string;
+    is_primary?: boolean;
+    sort_order?: number;
+  }[];
   is_published: boolean;
   is_best_seller: boolean;
+  collection_ids?: string;
+  collection_products?: {
+    sort_order: number;
+    collections: {
+      id: string;
+      name: string;
+      slug: string;
+      image_url: string;
+      is_published: boolean;
+    };
+  }[];
+  material?: string;
+  origin?: string;
+  finish?: string;
+  dimensions?: string;
+  weight?: string;
+  authenticity?: string;
   created_at?: string;
   updated_at?: string;
 }
 
 export interface ProductPayload {
+  sku?: string;
   name: string;
   slug: string;
   short_description: string;
@@ -146,6 +172,13 @@ export interface ProductPayload {
   alt_text: string;
   is_published: boolean;
   is_best_seller: boolean;
+  collection_ids?: string;
+  material?: string;
+  origin?: string;
+  finish?: string;
+  dimensions?: string;
+  weight?: string;
+  authenticity?: string;
 }
 
 export const productsApi = {
@@ -160,10 +193,17 @@ export const productsApi = {
     }),
 
   /** Full update — sends multipart/form-data with image files */
-  update: (id: string, data: FormData): Promise<Product> =>
+  update: (id: string, data: FormData | Partial<ProductPayload>): Promise<Product> =>
     apiSingle<Product>('/functions/v1/products', {
       method: 'PATCH',
-      body: data,
+      body: data instanceof FormData ? data : JSON.stringify(data),
+      params: { id },
+    }),
+
+  /** Delete a specific product image by ID */
+  deleteImage: (id: string): Promise<void> =>
+    apiSingle<void>('/functions/v1/products/images', {
+      method: 'DELETE',
       params: { id },
     }),
 
@@ -203,16 +243,16 @@ export const collectionsApi = {
   list: (): Promise<Collection[]> =>
     apiList<Collection>('/functions/v1/collections', { all: 'true' }),
 
-  create: (data: CollectionPayload): Promise<Collection> =>
+  create: (data: FormData | CollectionPayload): Promise<Collection> =>
     apiSingle<Collection>('/functions/v1/collections', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: data instanceof FormData ? data : JSON.stringify(data),
     }),
 
-  update: (id: string, data: Partial<CollectionPayload>): Promise<Collection> =>
+  update: (id: string, data: FormData | Partial<CollectionPayload>): Promise<Collection> =>
     apiSingle<Collection>('/functions/v1/collections', {
       method: 'PATCH',
-      body: JSON.stringify(data),
+      body: data instanceof FormData ? data : JSON.stringify(data),
       params: { id },
     }),
 
@@ -343,10 +383,28 @@ export interface Customer {
   id: string;
   email: string;
   created_at?: string;
+  full_name?: string;
   user_metadata?: { full_name?: string; name?: string };
 }
 
 export const customersApi = {
-  list: (): Promise<Customer[]> =>
-    apiList<Customer>('/functions/v1/customers', { all: 'true' }),
+  list: (search: string = '', page: number = 1, limit: number = 20): Promise<Customer[]> =>
+    apiSingle<Customer[]>('/rest/v1/rpc/get_customers', {
+      method: 'POST',
+      body: JSON.stringify({ p_search: search, p_page: page, p_limit: limit }),
+    }),
+};
+
+// ─── Dashboard API ────────────────────────────────────────────────────────────
+
+export interface DashboardCounts {
+  products: number;
+  customers: number;
+  new_enquiries: number;
+  collections_count: number;
+}
+
+export const dashboardApi = {
+  getCounts: (): Promise<DashboardCounts> =>
+    apiSingle<DashboardCounts>('/rest/v1/rpc/get_admin_dashboard_counts', { method: 'POST' }),
 };

@@ -14,9 +14,11 @@ const MAX_IMAGES = 5;
 interface ImageEntry {
   preview: string; // blob URL (new) or server URL (existing)
   file?: File;     // only for newly picked files
+  id?: string;     // the image id from the backend
 }
 
 const emptyForm = (): ProductPayload => ({
+  sku: '',
   name: '',
   slug: '',
   short_description: '',
@@ -24,6 +26,13 @@ const emptyForm = (): ProductPayload => ({
   alt_text: '',
   is_published: false,
   is_best_seller: false,
+  collection_ids: '',
+  material: '',
+  origin: '',
+  finish: '',
+  dimensions: '',
+  weight: '',
+  authenticity: '',
 });
 
 function slugify(str: string) {
@@ -42,6 +51,8 @@ export const Products = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ProductPayload>(emptyForm());
   const [imageEntries, setImageEntries] = useState<ImageEntry[]>([]);
+  const [deletedImages, setDeletedImages] = useState<string[]>([]);
+  const [collections, setCollections] = useState<any[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -55,8 +66,16 @@ export const Products = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const data = await productsApi.list();
+      // Assuming collectionsApi is added/available or just fetching products for now.
+      // If collectionsApi is exported in api.ts, we can fetch it, else we fetch products.
+      // We will import collectionsApi below.
+      const { collectionsApi } = await import('../lib/api');
+      const [data, colls] = await Promise.all([
+        productsApi.list(),
+        collectionsApi.list().catch(() => [])
+      ]);
       setProducts(data);
+      setCollections(colls);
     } catch (err) {
       show(err instanceof Error ? err.message : 'Failed to load products', 'error');
     } finally {
@@ -71,12 +90,14 @@ export const Products = () => {
     setForm(emptyForm());
     revokeBlobUrls(imageEntries);
     setImageEntries([]);
+    setDeletedImages([]);
     setModalOpen(true);
   };
 
   const openEdit = (p: Product) => {
     setEditingId(p.id);
     setForm({
+      sku: p.sku ?? '',
       name: p.name,
       slug: p.slug,
       short_description: p.short_description,
@@ -84,16 +105,31 @@ export const Products = () => {
       alt_text: p.alt_text ?? '',
       is_published: p.is_published,
       is_best_seller: p.is_best_seller,
+      collection_ids: p.collection_ids ?? p.collection_products?.[0]?.collections?.id ?? '',
+      material: p.material ?? '',
+      origin: p.origin ?? '',
+      finish: p.finish ?? '',
+      dimensions: p.dimensions ?? '',
+      weight: p.weight ?? '',
+      authenticity: p.authenticity ?? '',
     });
     revokeBlobUrls(imageEntries);
-    // Existing server images — no File object, just the URL for preview
-    setImageEntries((p.images ?? []).map((url) => ({ preview: url })));
+    // Existing server images — extract ID if available
+    const entries: ImageEntry[] = [];
+    if (p.product_images && p.product_images.length > 0) {
+      p.product_images.forEach(img => entries.push({ preview: img.image_url, id: img.id }));
+    } else if (p.images) {
+      p.images.forEach(url => entries.push({ preview: url }));
+    }
+    setImageEntries(entries);
+    setDeletedImages([]);
     setModalOpen(true);
   };
 
   /** Build FormData from current form state + image entries */
   const buildFormData = (): FormData => {
     const fd = new FormData();
+    if (form.sku) fd.append('sku', form.sku);
     fd.append('name', form.name);
     fd.append('slug', form.slug);
     fd.append('short_description', form.short_description || '');
@@ -101,9 +137,22 @@ export const Products = () => {
     fd.append('alt_text', form.alt_text || '');
     fd.append('is_published', String(form.is_published));
     fd.append('is_best_seller', String(form.is_best_seller));
-    // Only send new File objects; the server keeps existing images
+    if (form.collection_ids) fd.append('collection_ids', form.collection_ids);
+    if (form.material) fd.append('material', form.material);
+    if (form.origin) fd.append('origin', form.origin);
+    if (form.finish) fd.append('finish', form.finish);
+    if (form.dimensions) fd.append('dimensions', form.dimensions);
+    if (form.weight) fd.append('weight', form.weight);
+    if (form.authenticity) fd.append('authenticity', form.authenticity);
     imageEntries.forEach((entry) => {
-      if (entry.file) fd.append('images', entry.file);
+      if (entry.file) {
+        fd.append('images', entry.file);
+      } else if (entry.preview) {
+        fd.append('existing_images', entry.preview);
+      }
+    });
+    deletedImages.forEach((url) => {
+      fd.append('deleted_images', url);
     });
     return fd;
   };
@@ -118,15 +167,21 @@ export const Products = () => {
     try {
       const fd = buildFormData();
       if (editingId) {
-        const updated = await productsApi.update(editingId, fd);
-        setProducts((prev) => prev.map((p) => (p.id === editingId ? updated : p)));
+        await productsApi.update(editingId, fd);
+        
+        // Fire deletes for valid image IDs
+        const idsToDelete = deletedImages.filter(val => val && !val.startsWith('http'));
+        if (idsToDelete.length > 0) {
+          await Promise.allSettled(idsToDelete.map(id => productsApi.deleteImage(id)));
+        }
+
         show('Product updated successfully', 'success');
       } else {
-        const created = await productsApi.create(fd);
-        setProducts((prev) => [created, ...prev]);
+        await productsApi.create(fd);
         show('Product created successfully', 'success');
       }
       setModalOpen(false);
+      await load();
     } catch (err) {
       show(err instanceof Error ? err.message : 'Save failed', 'error');
     } finally {
@@ -194,7 +249,13 @@ export const Products = () => {
   const removeImage = (index: number) => {
     setImageEntries((prev) => {
       const entry = prev[index];
-      if (entry.file) URL.revokeObjectURL(entry.preview);
+      if (entry.file) {
+        URL.revokeObjectURL(entry.preview);
+      } else if (entry.id) {
+        setDeletedImages((d) => [...d, entry.id!]);
+      } else {
+        setDeletedImages((d) => [...d, entry.preview]);
+      }
       return prev.filter((_, i) => i !== index);
     });
   };
@@ -236,7 +297,9 @@ export const Products = () => {
             <thead>
               <tr>
                 <th>Name</th>
+                <th>SKU</th>
                 <th>Slug</th>
+                <th>Collection</th>
                 <th>Published</th>
                 <th>Best Seller</th>
                 <th>Actions</th>
@@ -247,9 +310,9 @@ export const Products = () => {
                 <tr key={p.id}>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                      {p.images && p.images[0] ? (
+                      {(p.product_images && p.product_images[0]) || (p.images && p.images[0]) ? (
                         <img
-                          src={p.images[0]}
+                          src={p.product_images?.[0]?.image_url || p.images?.[0]}
                           alt={p.alt_text || p.name}
                           style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 6, flexShrink: 0, border: '1px solid #e5e7eb' }}
                         />
@@ -262,9 +325,19 @@ export const Products = () => {
                     </div>
                   </td>
                   <td>
+                    <code style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                      {p.sku || '—'}
+                    </code>
+                  </td>
+                  <td>
                     <code style={{ fontSize: '0.8rem', background: '#f5f5f5', padding: '2px 6px', borderRadius: 4 }}>
                       {p.slug}
                     </code>
+                  </td>
+                  <td>
+                    <span style={{ fontSize: '0.85rem', color: '#4b5563' }}>
+                      {p.collection_products?.[0]?.collections?.name || '—'}
+                    </span>
                   </td>
                   <td>
                     <button
@@ -323,17 +396,39 @@ export const Products = () => {
         size="lg"
       >
         <form onSubmit={handleSave} id="product-form">
-          {/* Product Name */}
-          <div className="form-group">
-            <label className="form-label">Product Name *</label>
-            <input
-              className="form-control"
-              value={form.name}
-              onChange={(e) => setField('name', e.target.value)}
-              required
-              placeholder="e.g. Royal Oak Dining Table"
-            />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            {/* Product Name */}
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Product Name *</label>
+              <input
+                className="form-control"
+                value={form.name}
+                onChange={(e) => setField('name', e.target.value)}
+                required
+                placeholder="e.g. Royal Oak Dining Table"
+              />
+            </div>
+
+            {/* Category */}
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Category *</label>
+              <select
+                className="form-control"
+                value={form.collection_ids}
+                onChange={(e) => setField('collection_ids', e.target.value)}
+                required
+              >
+                <option value="">Select a category...</option>
+                {collections.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
+
+          <div style={{ height: '1.25rem' }}></div>
 
           {/* ── Image Upload Section ── */}
           <div className="form-group">
@@ -409,6 +504,19 @@ export const Products = () => {
             />
           </div>
 
+          {/* SKU */}
+          <div className="form-group">
+            <label className="form-label">SKU Code</label>
+            <input
+              className="form-control"
+              value={form.sku}
+              readOnly
+              disabled
+              placeholder="Auto-generated"
+              style={{ background: '#f9fafb', cursor: 'not-allowed', color: '#6b7280' }}
+            />
+          </div>
+
           {/* Slug */}
           <div className="form-group">
             <label className="form-label">Slug</label>
@@ -443,6 +551,72 @@ export const Products = () => {
             />
           </div>
 
+          <div style={{ margin: '2rem 0 1.5rem', borderTop: '1px solid #e5e7eb' }}></div>
+          <h3 style={{ fontSize: '1rem', fontWeight: 500, marginBottom: '1.5rem', color: 'var(--text-primary)', fontFamily: 'serif' }}>Product Specifications</h3>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Material</label>
+              <input
+                className="form-control"
+                value={form.material}
+                onChange={(e) => setField('material', e.target.value)}
+                placeholder="e.g. Natural Clear Quartz, 24K Gold Accents"
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Origin</label>
+              <input
+                className="form-control"
+                value={form.origin}
+                onChange={(e) => setField('origin', e.target.value)}
+                placeholder="e.g. India"
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Finish</label>
+              <input
+                className="form-control"
+                value={form.finish}
+                onChange={(e) => setField('finish', e.target.value)}
+                placeholder="e.g. Polished with Hand-Gilded Detailing"
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Dimensions</label>
+              <input
+                className="form-control"
+                value={form.dimensions}
+                onChange={(e) => setField('dimensions', e.target.value)}
+                placeholder="e.g. H 9.5 in x W 8.2 in x D 6.0 in"
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Weight</label>
+              <input
+                className="form-control"
+                value={form.weight}
+                onChange={(e) => setField('weight', e.target.value)}
+                placeholder="e.g. 6.2 kg"
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Authenticity</label>
+              <input
+                className="form-control"
+                value={form.authenticity}
+                onChange={(e) => setField('authenticity', e.target.value)}
+                placeholder="e.g. Includes Certificate of Authenticity"
+              />
+            </div>
+          </div>
+
           <div className="form-row-checks">
             <label className="check-label">
               <input
@@ -452,7 +626,7 @@ export const Products = () => {
               />
               <span>Published</span>
             </label>
-            <label className="check-label">
+            <label className="check-label" style={{ marginLeft: '1rem' }}>
               <input
                 type="checkbox"
                 checked={form.is_best_seller}
@@ -462,7 +636,7 @@ export const Products = () => {
             </label>
           </div>
 
-          <div className="modal-footer">
+          <div className="modal-footer" style={{ marginTop: '2rem' }}>
             <button type="button" className="btn-secondary" onClick={() => setModalOpen(false)}>
               Cancel
             </button>

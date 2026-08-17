@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Plus, Pencil, Trash2, RefreshCw } from 'lucide-react';
+import { Plus, Pencil, Trash2, RefreshCw, Upload, X } from 'lucide-react';
 import { collectionsApi, type Collection, type CollectionPayload } from '../lib/api';
 import { Modal } from '../components/Modal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -32,6 +32,8 @@ export const Collections = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<CollectionPayload>(emptyForm());
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
 
   const load = async () => {
     setLoading(true);
@@ -50,6 +52,9 @@ export const Collections = () => {
   const openAdd = () => {
     setEditingId(null);
     setForm(emptyForm());
+    if (imageFile) URL.revokeObjectURL(imagePreview);
+    setImageFile(null);
+    setImagePreview('');
     setModalOpen(true);
   };
 
@@ -64,6 +69,9 @@ export const Collections = () => {
       is_featured: c.is_featured,
       sort_order: c.sort_order,
     });
+    if (imageFile) URL.revokeObjectURL(imagePreview);
+    setImageFile(null);
+    setImagePreview(c.image_url || '');
     setModalOpen(true);
   };
 
@@ -71,12 +79,25 @@ export const Collections = () => {
     e.preventDefault();
     setSaving(true);
     try {
+      const fd = new FormData();
+      fd.append('name', form.name);
+      fd.append('slug', form.slug);
+      fd.append('description', form.description);
+      fd.append('is_published', String(form.is_published));
+      fd.append('is_featured', String(form.is_featured));
+      fd.append('sort_order', String(form.sort_order));
+      if (imageFile) {
+        fd.append('image', imageFile);
+      } else if (form.image_url) {
+        fd.append('image_url', form.image_url);
+      }
+
       if (editingId) {
-        const updated = await collectionsApi.update(editingId, form);
+        const updated = await collectionsApi.update(editingId, fd);
         setCollections((prev) => prev.map((c) => (c.id === editingId ? updated : c)));
         show('Collection updated', 'success');
       } else {
-        const created = await collectionsApi.create(form);
+        const created = await collectionsApi.create(fd);
         setCollections((prev) => [created, ...prev]);
         show('Collection created', 'success');
       }
@@ -260,14 +281,50 @@ export const Collections = () => {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Image URL</label>
-            <input
-              className="form-control"
-              type="url"
-              value={form.image_url}
-              onChange={(e) => setField('image_url', e.target.value)}
-              placeholder="https://..."
-            />
+            <label className="form-label">Collection Image</label>
+            {!imagePreview ? (
+              <div
+                className="img-dropzone"
+                style={{ padding: '2rem 1rem' }}
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = 'image/*';
+                  input.onchange = (e) => {
+                    const file = (e.target as HTMLInputElement).files?.[0];
+                    if (file) {
+                      setImageFile(file);
+                      setImagePreview(URL.createObjectURL(file));
+                    }
+                  };
+                  input.click();
+                }}
+              >
+                <Upload size={22} color="#6b7280" />
+                <p style={{ margin: '0.4rem 0 0', fontSize: '0.875rem', color: '#6b7280' }}>
+                  Click to upload image
+                </p>
+              </div>
+            ) : (
+              <div className="img-preview-grid" style={{ gridTemplateColumns: '1fr' }}>
+                <div className="img-preview-item" style={{ height: '180px', width: '100%', maxWidth: '240px' }}>
+                  <img src={imagePreview} alt="Preview" style={{ objectFit: 'contain' }} />
+                  <button
+                    type="button"
+                    className="img-remove-btn"
+                    onClick={() => {
+                      if (imageFile) URL.revokeObjectURL(imagePreview);
+                      setImageFile(null);
+                      setImagePreview('');
+                      setField('image_url', '');
+                    }}
+                    title="Remove image"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="form-group">

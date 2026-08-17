@@ -10,11 +10,14 @@ export const Customers = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  const load = async () => {
+  const [page, setPage] = useState(1);
+  const limit = 20;
+
+  const load = async (query = search, p = page) => {
     setLoading(true);
     try {
-      const data = await customersApi.list();
-      setCustomers(data);
+      const data = await customersApi.list(query, p, limit);
+      setCustomers(data || []);
     } catch (err) {
       show(err instanceof Error ? err.message : 'Failed to load customers', 'error');
     } finally {
@@ -22,13 +25,13 @@ export const Customers = () => {
     }
   };
 
-  useEffect(() => { load(); }, []);
-
-  const filtered = customers.filter((c) => {
-    const q = search.toLowerCase();
-    const name = c.user_metadata?.full_name || c.user_metadata?.name || '';
-    return c.email.toLowerCase().includes(q) || name.toLowerCase().includes(q);
-  });
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      load(search, 1);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   return (
     <div>
@@ -39,7 +42,7 @@ export const Customers = () => {
             {customers.length} customer{customers.length !== 1 ? 's' : ''} total
           </p>
         </div>
-        <button className="btn-secondary icon-btn-sm" onClick={load} title="Refresh">
+        <button className="btn-secondary icon-btn-sm" onClick={() => load(search, page)} title="Refresh">
           <RefreshCw size={16} />
         </button>
       </div>
@@ -58,7 +61,7 @@ export const Customers = () => {
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         {loading ? (
           <div style={{ padding: '1.5rem' }}><LoadingSkeleton rows={6} /></div>
-        ) : filtered.length === 0 ? (
+        ) : customers.length === 0 ? (
           <div className="empty-state">
             <p>{search ? 'No customers match your search.' : 'No customers yet.'}</p>
           </div>
@@ -72,8 +75,8 @@ export const Customers = () => {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((c) => {
-                const name = c.user_metadata?.full_name || c.user_metadata?.name || 'Unknown';
+              {customers.map((c) => {
+                const name = c.full_name || c.user_metadata?.full_name || c.user_metadata?.name || 'Unknown';
                 return (
                   <tr key={c.id}>
                     <td>
