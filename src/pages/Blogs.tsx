@@ -1,11 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Plus, Pencil, Trash2, RefreshCw } from 'lucide-react';
-import { blogsApi, type Blog, type BlogPayload } from '../lib/api';
+import { Plus, Pencil, Trash2, RefreshCw, Upload, X } from 'lucide-react';
+import { blogsApi, storageApi, type Blog, type BlogPayload } from '../lib/api';
 import { Modal } from '../components/Modal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { StatusBadge } from '../components/StatusBadge';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { useToastContext } from '../context/ToastContext';
+import Editor from 'react-simple-wysiwyg';
 
 const emptyForm = (): BlogPayload => ({
   title: '',
@@ -13,6 +14,9 @@ const emptyForm = (): BlogPayload => ({
   excerpt: '',
   content: '',
   cover_image_url: '',
+  category: '',
+  author: '',
+  date: '',
   status: 'draft',
 });
 
@@ -31,6 +35,8 @@ export const Blogs = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<BlogPayload>(emptyForm());
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
 
   const load = async () => {
     setLoading(true);
@@ -49,6 +55,9 @@ export const Blogs = () => {
   const openAdd = () => {
     setEditingId(null);
     setForm(emptyForm());
+    if (imageFile) URL.revokeObjectURL(imagePreview);
+    setImageFile(null);
+    setImagePreview('');
     setModalOpen(true);
   };
 
@@ -59,9 +68,15 @@ export const Blogs = () => {
       slug: b.slug,
       excerpt: b.excerpt,
       content: b.content,
-      cover_image_url: b.cover_image_url,
+      cover_image_url: b.cover_image_url || '',
+      category: b.category || '',
+      author: b.author || '',
+      date: b.date || '',
       status: b.status,
     });
+    if (imageFile) URL.revokeObjectURL(imagePreview);
+    setImageFile(null);
+    setImagePreview(b.cover_image_url || '');
     setModalOpen(true);
   };
 
@@ -69,12 +84,47 @@ export const Blogs = () => {
     e.preventDefault();
     setSaving(true);
     try {
+      // ── Step 1: Upload image to blog-images bucket if a new file was selected ──
+      let coverImageUrl = form.cover_image_url;
+      if (imageFile) {
+        show('Uploading image…', 'success');
+        coverImageUrl = await storageApi.uploadBlogImage(imageFile);
+      }
+
       if (editingId) {
-        const updated = await blogsApi.update(editingId, form);
+        // ── UPDATE: PATCH only accepts JSON ──────────────────────
+        const payload: Partial<BlogPayload> = {
+          title: form.title,
+          slug: form.slug,
+          excerpt: form.excerpt,
+          content: form.content,
+          category: form.category,
+          author: form.author,
+          date: form.date,
+          status: form.status,
+          cover_image_url: coverImageUrl,
+        };
+        const updated = await blogsApi.update(
+          editingId,
+          payload,
+          form.status === 'published' ? 'publish' : 'draft'
+        );
         setBlogs((prev) => prev.map((b) => (b.id === editingId ? updated : b)));
         show('Blog updated', 'success');
       } else {
-        const created = await blogsApi.create(form);
+        // ── CREATE: POST with JSON body ───────────────────────────
+        const payload: BlogPayload = {
+          title: form.title,
+          slug: form.slug,
+          excerpt: form.excerpt,
+          content: form.content,
+          category: form.category,
+          author: form.author,
+          date: form.date,
+          status: form.status,
+          cover_image_url: coverImageUrl,
+        };
+        const created = await blogsApi.create(payload);
         setBlogs((prev) => [created, ...prev]);
         show('Blog created', 'success');
       }
@@ -150,7 +200,8 @@ export const Blogs = () => {
               <tr>
                 <th>Cover</th>
                 <th>Title</th>
-                <th>Excerpt</th>
+                <th>Category</th>
+                <th>Author</th>
                 <th>Status</th>
                 <th>Date</th>
                 <th>Actions</th>
@@ -181,8 +232,11 @@ export const Blogs = () => {
                     <div style={{ fontWeight: 600 }}>{b.title}</div>
                     <code style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>/{b.slug}</code>
                   </td>
-                  <td style={{ maxWidth: 220, color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                    {b.excerpt?.slice(0, 70)}{b.excerpt?.length > 70 ? '…' : ''}
+                  <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                    {b.category || '—'}
+                  </td>
+                  <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                    {b.author || '—'}
                   </td>
                   <td>
                     <button className="toggle-btn" onClick={() => toggleStatus(b)}>
@@ -193,7 +247,7 @@ export const Blogs = () => {
                     </button>
                   </td>
                   <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                    {b.created_at ? new Date(b.created_at).toLocaleDateString() : '—'}
+                    {b.date ? b.date : (b.created_at ? new Date(b.created_at).toLocaleDateString() : '—')}
                   </td>
                   <td>
                     <div className="action-btns">
@@ -267,26 +321,91 @@ export const Blogs = () => {
             />
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Cover Image URL</label>
-            <input
-              className="form-control"
-              type="url"
-              value={form.cover_image_url}
-              onChange={(e) => setField('cover_image_url', e.target.value)}
-              placeholder="https://..."
-            />
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label">Category</label>
+              <input
+                className="form-control"
+                value={form.category}
+                onChange={(e) => setField('category', e.target.value)}
+                placeholder="e.g. Craftsmanship"
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Author</label>
+              <input
+                className="form-control"
+                value={form.author}
+                onChange={(e) => setField('author', e.target.value)}
+                placeholder="Author Name"
+              />
+            </div>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Content (HTML)</label>
-            <textarea
-              className="form-control"
-              rows={6}
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label">Date</label>
+              <input
+                className="form-control"
+                type="date"
+                value={form.date}
+                onChange={(e) => setField('date', e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Blog Image</label>
+              {!imagePreview ? (
+                <div
+                  className="img-dropzone"
+                  style={{ padding: '2rem 1rem' }}
+                  onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*';
+                    input.onchange = (e) => {
+                      const file = (e.target as HTMLInputElement).files?.[0];
+                      if (file) {
+                        setImageFile(file);
+                        setImagePreview(URL.createObjectURL(file));
+                      }
+                    };
+                    input.click();
+                  }}
+                >
+                  <Upload size={22} color="#6b7280" />
+                  <p style={{ margin: '0.4rem 0 0', fontSize: '0.875rem', color: '#6b7280' }}>
+                    Click to upload image
+                  </p>
+                </div>
+              ) : (
+                <div className="img-preview-grid" style={{ gridTemplateColumns: '1fr' }}>
+                  <div className="img-preview-item" style={{ height: '180px', width: '100%', maxWidth: '240px' }}>
+                    <img src={imagePreview} alt="Preview" style={{ objectFit: 'contain' }} />
+                    <button
+                      type="button"
+                      className="img-remove-btn"
+                      onClick={() => {
+                        if (imageFile) URL.revokeObjectURL(imagePreview);
+                        setImageFile(null);
+                        setImagePreview('');
+                        setField('cover_image_url', '');
+                      }}
+                      title="Remove image"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="form-group" style={{ paddingBottom: '40px' }}>
+            <label className="form-label">Content</label>
+            <Editor
               value={form.content}
               onChange={(e) => setField('content', e.target.value)}
-              placeholder="<h2>...</h2><p>...</p>"
-              style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
+              containerProps={{ style: { height: '300px', overflowY: 'auto' } }}
             />
           </div>
 

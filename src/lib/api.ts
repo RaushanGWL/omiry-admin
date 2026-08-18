@@ -270,6 +270,43 @@ export const collectionsApi = {
     }),
 };
 
+// ─── Storage API ──────────────────────────────────────────────────────────────
+
+export const storageApi = {
+  /**
+   * Upload an image file to the public `blog-images` bucket.
+   * Returns the permanent public URL of the uploaded file.
+   */
+  uploadBlogImage: async (file: File): Promise<string> => {
+    const ext = file.name.split('.').pop() ?? 'jpg';
+    const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const token = getToken();
+
+    const res = await fetch(
+      `${BASE_URL}/storage/v1/object/blog-images/${filename}`,
+      {
+        method: 'POST',
+        headers: {
+          apikey: ANON_KEY,
+          Authorization: `Bearer ${token}`,
+          'Content-Type': file.type || 'application/octet-stream',
+        },
+        body: file,
+      }
+    );
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        (err as { message?: string }).message || `Storage upload failed (${res.status})`
+      );
+    }
+
+    // Public bucket — return the direct public URL
+    return `${BASE_URL}/storage/v1/object/public/blog-images/${filename}`;
+  },
+};
+
 // ─── Blogs API ────────────────────────────────────────────────────────────────
 
 export interface Blog {
@@ -279,6 +316,9 @@ export interface Blog {
   excerpt: string;
   content: string;
   cover_image_url: string;
+  category?: string;
+  author?: string;
+  date?: string;
   status: 'draft' | 'published';
   created_at?: string;
   updated_at?: string;
@@ -290,17 +330,18 @@ export const blogsApi = {
   list: (): Promise<Blog[]> =>
     apiList<Blog>('/functions/v1/blogs', { all: 'true' }),
 
-  create: (data: BlogPayload): Promise<Blog> =>
+  create: (data: FormData | BlogPayload, action?: 'publish' | 'draft'): Promise<Blog> =>
     apiSingle<Blog>('/functions/v1/blogs', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: data instanceof FormData ? data : JSON.stringify(data),
+      ...(action ? { params: { action } } : {}),
     }),
 
-  update: (id: string, data: Partial<BlogPayload>): Promise<Blog> =>
+  update: (id: string, data: FormData | Partial<BlogPayload>, action?: 'publish' | 'draft'): Promise<Blog> =>
     apiSingle<Blog>('/functions/v1/blogs', {
       method: 'PATCH',
-      body: JSON.stringify(data),
-      params: { id },
+      body: data instanceof FormData ? data : JSON.stringify(data),
+      params: { id, ...(action ? { action } : {}) },
     }),
 
   delete: (id: string): Promise<void> =>

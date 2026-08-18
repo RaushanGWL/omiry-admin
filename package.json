@@ -13,7 +13,9 @@
     "lucide-react": "^1.31.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-router-dom": "^7.18.2"
+    "react-quill": "^2.0.0",
+    "react-router-dom": "^7.18.2",
+    "react-simple-wysiwyg": "^3.4.1"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
