@@ -305,6 +305,38 @@ export const storageApi = {
     // Public bucket — return the direct public URL
     return `${BASE_URL}/storage/v1/object/public/blog-images/${filename}`;
   },
+
+  /**
+   * Upload a hero section image to the public `hero-images` bucket.
+   * Returns the permanent public URL of the uploaded file.
+   */
+  uploadHeroImage: async (file: File): Promise<string> => {
+    const ext = file.name.split('.').pop() ?? 'jpg';
+    const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const token = getToken();
+
+    const res = await fetch(
+      `${BASE_URL}/storage/v1/object/hero-images/${filename}`,
+      {
+        method: 'POST',
+        headers: {
+          apikey: ANON_KEY,
+          Authorization: `Bearer ${token}`,
+          'Content-Type': file.type || 'application/octet-stream',
+        },
+        body: file,
+      }
+    );
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        (err as { message?: string }).message || `Hero image upload failed (${res.status})`
+      );
+    }
+
+    return `${BASE_URL}/storage/v1/object/public/hero-images/${filename}`;
+  },
 };
 
 // ─── Blogs API ────────────────────────────────────────────────────────────────

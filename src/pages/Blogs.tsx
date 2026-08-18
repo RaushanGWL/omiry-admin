@@ -228,14 +228,58 @@ export const Blogs = () => {
                       >📄</div>
                     )}
                   </td>
-                  <td>
-                    <div style={{ fontWeight: 600 }}>{b.title}</div>
-                    <code style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>/{b.slug}</code>
+                  <td style={{ maxWidth: '260px' }}>
+                    <div
+                      style={{
+                        fontWeight: 600,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        maxWidth: '240px',
+                      }}
+                      title={b.title}
+                    >
+                      {b.title}
+                    </div>
+                    <code
+                      style={{
+                        fontSize: '0.75rem',
+                        color: 'var(--text-secondary)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        display: 'block',
+                        maxWidth: '240px',
+                      }}
+                      title={`/${b.slug}`}
+                    >
+                      /{b.slug}
+                    </code>
                   </td>
-                  <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                  <td
+                    style={{
+                      color: 'var(--text-secondary)',
+                      fontSize: '0.85rem',
+                      maxWidth: '120px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                    title={b.category || ''}
+                  >
                     {b.category || '—'}
                   </td>
-                  <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                  <td
+                    style={{
+                      color: 'var(--text-secondary)',
+                      fontSize: '0.85rem',
+                      maxWidth: '120px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                    title={b.author || ''}
+                  >
                     {b.author || '—'}
                   </td>
                   <td>
@@ -285,8 +329,12 @@ export const Blogs = () => {
               value={form.title}
               onChange={(e) => setField('title', e.target.value)}
               required
+              maxLength={120}
               placeholder="Blog post title..."
             />
+            <small style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+              {form.title.length}/120
+            </small>
           </div>
 
           <div className="form-grid-2">
@@ -296,6 +344,7 @@ export const Blogs = () => {
                 className="form-control"
                 value={form.slug}
                 onChange={(e) => setField('slug', e.target.value)}
+                maxLength={150}
               />
             </div>
             <div className="form-group">
@@ -318,7 +367,11 @@ export const Blogs = () => {
               value={form.excerpt}
               onChange={(e) => setField('excerpt', e.target.value)}
               placeholder="Short summary..."
+              maxLength={200}
             />
+            <small style={{ color: form.excerpt.length > 180 ? '#e53e3e' : 'var(--text-secondary)', fontSize: '0.75rem' }}>
+              {form.excerpt.length}/200
+            </small>
           </div>
 
           <div className="form-grid-2">
@@ -329,6 +382,7 @@ export const Blogs = () => {
                 value={form.category}
                 onChange={(e) => setField('category', e.target.value)}
                 placeholder="e.g. Craftsmanship"
+                maxLength={50}
               />
             </div>
             <div className="form-group">
@@ -338,6 +392,7 @@ export const Blogs = () => {
                 value={form.author}
                 onChange={(e) => setField('author', e.target.value)}
                 placeholder="Author Name"
+                maxLength={80}
               />
             </div>
           </div>

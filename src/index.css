@@ -634,3 +634,6 @@ select {
   background-position: right 0.75rem center;
   padding-right: 2.5rem;
 }
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
