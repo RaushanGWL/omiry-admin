@@ -37,7 +37,7 @@ export const Faqs = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const params = blogIdFilter ? { blog_id: `eq.${blogIdFilter}` } : { type: 'eq.home' };
+      const params: Record<string, string> = blogIdFilter ? { blog_id: `eq.${blogIdFilter}` } : { type: 'eq.home' };
       const data = await faqsApi.list(params);
       setFaqs(data);
     } catch (err) {
