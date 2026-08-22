@@ -433,19 +433,66 @@ export interface Enquiry {
   name: string;
   email: string;
   phone?: string;
+  subject?: string;
+  sku?: string;
+  product_sku?: string;
   message: string;
-  status: 'new' | 'read' | 'resolved';
+  /** All known status values from the API */
+  status: 'new' | 'read' | 'contacted' | 'resolved';
   created_at?: string;
+  updated_at?: string;
+}
+
+export interface EnquiriesListResponse {
+  data: Enquiry[];
+  pagination: { page: number; limit: number; total: number; total_pages: number };
 }
 
 export const enquiriesApi = {
+  /** List all enquiries (no pagination) */
   list: (): Promise<Enquiry[]> =>
-    apiList<Enquiry>('/functions/v1/enquiries', { all: 'true' }),
+    apiList<Enquiry>('/functions/v1/enquiries'),
 
+  /** Paginated list */
+  listPaginated: async (
+    page: number = 1,
+    limit: number = 20
+  ): Promise<EnquiriesListResponse> => {
+    const res = await apiFetch<ApiResponse<Enquiry[]>>('/functions/v1/enquiries', {
+      params: { page: String(page), limit: String(limit) },
+    });
+    return {
+      data: Array.isArray(res.data) ? res.data : [],
+      pagination: res.pagination ?? { page, limit, total: 0, total_pages: 0 },
+    };
+  },
+
+  /** Fetch a single enquiry by ID */
+  getById: (id: string): Promise<Enquiry> =>
+    apiSingle<Enquiry>('/functions/v1/enquiries', {
+      params: { id },
+    }),
+
+  /** Update status of an enquiry */
+  updateStatus: (id: string, status: Enquiry['status']): Promise<Enquiry> =>
+    apiSingle<Enquiry>('/functions/v1/enquiries', {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+      params: { id },
+    }),
+
+  /** General partial update */
   update: (id: string, data: Partial<Enquiry>): Promise<Enquiry> =>
     apiSingle<Enquiry>('/functions/v1/enquiries', {
       method: 'PATCH',
       body: JSON.stringify(data),
+      params: { id },
+    }),
+
+  /** Delete an enquiry by ID */
+  delete: (id: string): Promise<void> =>
+    apiFetch<void>('/functions/v1/enquiries', {
+      method: 'DELETE',
       params: { id },
     }),
 };
@@ -481,3 +528,54 @@ export const dashboardApi = {
   getCounts: (): Promise<DashboardCounts> =>
     apiSingle<DashboardCounts>('/rest/v1/rpc/get_admin_dashboard_counts', { method: 'POST' }),
 };
+
+// ─── FAQs API ─────────────────────────────────────────────────────────────────
+
+export interface Faq {
+  id: string;
+  question: string;
+  answer: string;
+  type: string;
+  blog_id: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type FaqPayload = Omit<Faq, 'id' | 'created_at' | 'updated_at'>;
+
+export const faqsApi = {
+  list: (params?: Record<string, string>): Promise<Faq[]> =>
+    apiList<Faq>('/rest/v1/faqs', { select: '*', order: 'sort_order.asc', ...params }),
+
+  create: (data: FaqPayload): Promise<Faq> =>
+    apiSingle<Faq[]>('/rest/v1/faqs', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      headers: { Prefer: 'return=representation' }
+    }).then(res => (Array.isArray(res) ? res[0] : res)),
+
+  update: (id: string, data: Partial<FaqPayload>): Promise<Faq> =>
+    apiSingle<Faq[]>('/rest/v1/faqs', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+      params: { id: `eq.${id}` },
+      headers: { Prefer: 'return=representation' }
+    }).then(res => (Array.isArray(res) ? res[0] : res)),
+
+  delete: (id: string): Promise<void> =>
+    apiFetch<void>('/rest/v1/faqs', {
+      method: 'DELETE',
+      params: { id: `eq.${id}` },
+    }),
+    
+  action: (id: string, action: 'publish' | 'unpublish'): Promise<Faq> =>
+    apiSingle<Faq[]>('/rest/v1/faqs', {
+      method: 'PATCH',
+      body: JSON.stringify({ is_active: action === 'publish' }),
+      params: { id: `eq.${id}` },
+      headers: { Prefer: 'return=representation' }
+    }).then(res => (Array.isArray(res) ? res[0] : res)),
+};
+

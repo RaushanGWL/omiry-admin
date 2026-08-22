@@ -117,6 +117,7 @@ export const Dashboard = () => {
             <thead>
               <tr>
                 <th>Name</th>
+                <th>SKU</th>
                 <th>Email</th>
                 <th>Message</th>
                 <th>Status</th>
@@ -127,6 +128,22 @@ export const Dashboard = () => {
               {enquiries.map((enq) => (
                 <tr key={enq.id}>
                   <td style={{ fontWeight: 600 }}>{enq.name || '—'}</td>
+                  <td>
+                    {(enq.sku || enq.product_sku) ? (
+                      <span style={{
+                        fontFamily: 'monospace',
+                        fontSize: '0.78rem',
+                        background: '#f3f4f6',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '4px',
+                        padding: '2px 6px',
+                        color: '#374151',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {enq.sku || enq.product_sku}
+                      </span>
+                    ) : '—'}
+                  </td>
                   <td>{enq.email}</td>
                   <td style={{ maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {enq.message || '—'}

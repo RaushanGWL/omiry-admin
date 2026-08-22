@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Plus, Pencil, Trash2, RefreshCw, Upload, X } from 'lucide-react';
-import { blogsApi, storageApi, type Blog, type BlogPayload } from '../lib/api';
+import { Plus, Pencil, Trash2, RefreshCw, Upload, X, HelpCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { blogsApi, storageApi, faqsApi, type Blog, type BlogPayload } from '../lib/api';
 import { Modal } from '../components/Modal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { StatusBadge } from '../components/StatusBadge';
@@ -25,6 +26,7 @@ function slugify(str: string) {
 }
 
 export const Blogs = () => {
+  const navigate = useNavigate();
   const { show } = useToastContext();
   const [blogs, setBlogs] = useState<Blog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,6 +39,11 @@ export const Blogs = () => {
   const [form, setForm] = useState<BlogPayload>(emptyForm());
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
+
+  const [faqModalOpen, setFaqModalOpen] = useState(false);
+  const [faqForm, setFaqForm] = useState({ question: '', answer: '', sort_order: 1, is_active: true });
+  const [savingFaq, setSavingFaq] = useState(false);
+  const [faqSortOrderError, setFaqSortOrderError] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -170,6 +177,40 @@ export const Blogs = () => {
     });
   };
 
+  const openFaqModal = () => {
+    setFaqForm({ question: '', answer: '', sort_order: 1, is_active: true });
+    setFaqSortOrderError(null);
+    setFaqModalOpen(false); // Reset to ensure modal triggers open correctly
+    setTimeout(() => setFaqModalOpen(true), 10);
+  };
+
+  const handleFaqSave = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!editingId) return;
+    setSavingFaq(true);
+    try {
+      await faqsApi.create({
+        question: faqForm.question,
+        answer: faqForm.answer,
+        type: 'blog',
+        blog_id: editingId,
+        sort_order: faqForm.sort_order,
+        is_active: faqForm.is_active,
+      });
+      show('FAQ added to this blog', 'success');
+      setFaqModalOpen(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('faqs_blog_sort_order_unique') || msg.includes('faqs_type_sort_order_unique') || msg.includes('duplicate key value violates unique constraint')) {
+        setFaqSortOrderError('This sort order is already in use. Please choose a different order.');
+      } else {
+        show(msg, 'error');
+      }
+    } finally {
+      setSavingFaq(false);
+    }
+  };
+
   return (
     <div>
       <div className="page-header">
@@ -295,13 +336,20 @@ export const Blogs = () => {
                   </td>
                   <td>
                     <div className="action-btns">
-                      <button className="icon-action edit" onClick={() => openEdit(b)} title="Edit">
+                      <button
+                        className="icon-action"
+                        onClick={() => navigate(`/faqs?blog_id=${b.id}`)}
+                        data-tooltip="Manage FAQs for this blog"
+                      >
+                        <HelpCircle size={15} />
+                      </button>
+                      <button className="icon-action edit" onClick={() => openEdit(b)} data-tooltip="Edit">
                         <Pencil size={15} />
                       </button>
                       <button
                         className="icon-action delete"
                         onClick={() => setDeleteId(b.id)}
-                        title="Delete"
+                        data-tooltip="Delete"
                       >
                         <Trash2 size={15} />
                       </button>
@@ -464,6 +512,22 @@ export const Blogs = () => {
             />
           </div>
 
+          {editingId && (
+            <div className="form-group" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <label className="form-label" style={{ marginBottom: 0 }}>Blog FAQs</label>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
+                    Add FAQs specifically for this blog post.
+                  </p>
+                </div>
+                <button type="button" className="btn-secondary icon-btn-sm" onClick={openFaqModal} style={{ fontSize: '0.85rem' }}>
+                  <Plus size={16} /> Add FAQ
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="modal-footer">
             <button type="button" className="btn-secondary" onClick={() => setModalOpen(false)}>
               Cancel
@@ -483,6 +547,63 @@ export const Blogs = () => {
         onCancel={() => setDeleteId(null)}
         loading={deleting}
       />
+
+      <Modal
+        isOpen={faqModalOpen}
+        onClose={() => setFaqModalOpen(false)}
+        title="Add FAQ for this Blog"
+        size="md"
+      >
+        <form onSubmit={handleFaqSave}>
+          <div className="form-group">
+            <label className="form-label">Question *</label>
+            <input
+              className="form-control"
+              value={faqForm.question}
+              onChange={(e) => setFaqForm({ ...faqForm, question: e.target.value })}
+              required
+              placeholder="Enter the FAQ question..."
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Answer *</label>
+            <textarea
+              className="form-control"
+              value={faqForm.answer}
+              onChange={(e) => setFaqForm({ ...faqForm, answer: e.target.value })}
+              required
+              rows={3}
+              placeholder="Enter the FAQ answer..."
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Sort Order</label>
+            <input
+              type="number"
+              className={`form-control ${faqSortOrderError ? 'input-error' : ''}`}
+              value={faqForm.sort_order}
+              onChange={(e) => {
+                setFaqForm({ ...faqForm, sort_order: parseInt(e.target.value) || 0 });
+                if (faqSortOrderError) setFaqSortOrderError(null);
+              }}
+              style={{ maxWidth: '100px' }}
+            />
+            {faqSortOrderError && (
+              <small style={{ color: '#e53e3e', fontSize: '0.75rem', display: 'block', marginTop: '0.25rem' }}>
+                {faqSortOrderError}
+              </small>
+            )}
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn-secondary" onClick={() => setFaqModalOpen(false)}>
+              Cancel
+            </button>
+            <button type="submit" className="btn-primary" disabled={savingFaq}>
+              {savingFaq ? 'Saving…' : 'Save FAQ'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };
