@@ -14,6 +14,7 @@ import {
 import { enquiriesApi, type Enquiry } from '../lib/api';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { useToastContext } from '../context/ToastContext';
+import { ContactMessagesTable } from '../components/ContactMessagesTable';
 
 const STATUS_OPTIONS: Enquiry['status'][] = ['new', 'read', 'contacted', 'resolved'];
 
@@ -35,6 +36,8 @@ const PAGE_LIMIT = 20;
 
 export const Enquiries = () => {
   const { show } = useToastContext();
+
+  const [activeTab, setActiveTab] = useState<'purchase' | 'messages'>('purchase');
 
   // list state
   const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
@@ -135,19 +138,39 @@ export const Enquiries = () => {
   return (
     <div>
       {/* Page Header */}
-      <div className="page-header">
+      <div className="page-header" style={{ flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h2>Purchase Enquiries</h2>
-          <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-            {total} total · {counts.new} new · {counts.contacted} contacted · {counts.resolved} resolved
-          </p>
+          <h2 style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <span
+              style={{ cursor: 'pointer', color: activeTab === 'purchase' ? 'inherit' : 'var(--text-secondary)' }}
+              onClick={() => setActiveTab('purchase')}
+            >
+              Purchase Enquiries
+            </span>
+            <span style={{ color: '#d1d5db' }}>|</span>
+            <span
+              style={{ cursor: 'pointer', color: activeTab === 'messages' ? 'inherit' : 'var(--text-secondary)' }}
+              onClick={() => setActiveTab('messages')}
+            >
+              Messages
+            </span>
+          </h2>
+          {activeTab === 'purchase' && (
+            <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+              {total} total · {counts.new} new · {counts.contacted} contacted · {counts.resolved} resolved
+            </p>
+          )}
         </div>
-        <button className="btn-secondary icon-btn-sm" onClick={() => load(page)} title="Refresh">
-          <RefreshCw size={16} />
-        </button>
+        {activeTab === 'purchase' && (
+          <button className="btn-secondary icon-btn-sm" onClick={() => load(page)} title="Refresh">
+            <RefreshCw size={16} />
+          </button>
+        )}
       </div>
 
-      {/* Filter Tabs */}
+      {activeTab === 'purchase' ? (
+        <>
+          {/* Filter Tabs */}
       <div className="filter-tabs">
         {(['all', 'new', 'read', 'contacted', 'resolved'] as const).map((tab) => (
           <button
@@ -407,6 +430,10 @@ export const Enquiries = () => {
             </div>
           </div>
         </div>
+      )}
+        </>
+      ) : (
+        <ContactMessagesTable />
       )}
     </div>
   );

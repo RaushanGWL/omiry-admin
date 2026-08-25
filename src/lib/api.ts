@@ -55,6 +55,13 @@ async function apiFetch<T>(
   const json = await response.json().catch(() => ({}));
 
   if (!response.ok) {
+    if (response.status === 401) {
+      clearToken();
+      sessionStorage.setItem('auth_error', 'Your session has expired. Please login again.');
+      window.location.href = '/login';
+      return {} as T;
+    }
+
     const errMsg =
       (json as { message?: string; error?: string }).message ||
       (json as { error?: string }).error ||
@@ -493,6 +500,47 @@ export const enquiriesApi = {
   delete: (id: string): Promise<void> =>
     apiFetch<void>('/functions/v1/enquiries', {
       method: 'DELETE',
+      params: { id },
+    }),
+};
+
+// ─── Contact Info API ─────────────────────────────────────────────────────────
+
+export interface ContactMessage {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  mobile?: string;
+  phone_number?: string;
+  mobile_number?: string;
+  message: string;
+  created_at?: string;
+}
+
+export interface ContactMessagesListResponse {
+  data: ContactMessage[];
+  pagination: { page: number; limit: number; total: number; total_pages: number };
+}
+
+export const contactInfoApi = {
+  /** Paginated list */
+  listPaginated: async (
+    page: number = 1,
+    limit: number = 20
+  ): Promise<ContactMessagesListResponse> => {
+    const res = await apiFetch<ApiResponse<ContactMessage[]>>('/functions/v1/contact-info', {
+      params: { page: String(page), limit: String(limit) },
+    });
+    return {
+      data: Array.isArray(res.data) ? res.data : [],
+      pagination: res.pagination ?? { page, limit, total: 0, total_pages: 0 },
+    };
+  },
+
+  /** Fetch a single contact message by ID */
+  getById: (id: string): Promise<ContactMessage> =>
+    apiSingle<ContactMessage>('/functions/v1/contact-info', {
       params: { id },
     }),
 };
