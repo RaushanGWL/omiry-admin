@@ -206,7 +206,7 @@ export const Enquiries = () => {
                     style={{ cursor: 'pointer', flex: 1 }}
                     onClick={() => openDetail(enq)}
                   >
-                    <span className="enquiry-name">{enq.name || 'Anonymous'}</span>
+                    <span className="enquiry-name">{enq.full_name || enq.name || 'Anonymous'}</span>
                     <div className="enquiry-contact">
                       <Mail size={13} />
                       <span>{enq.email}</span>
@@ -330,7 +330,7 @@ export const Enquiries = () => {
                 <div className="drawer-section">
                   <div className="drawer-meta-row">
                     <User size={15} />
-                    <strong>{selected.name || 'Anonymous'}</strong>
+                    <strong>{selected.full_name || selected.name || 'Anonymous'}</strong>
                   </div>
                   <div className="drawer-meta-row">
                     <Mail size={15} />

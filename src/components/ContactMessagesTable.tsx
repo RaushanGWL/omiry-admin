@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { RefreshCw, Mail, Phone, ChevronLeft, ChevronRight, X, MessageSquare, User, Calendar } from 'lucide-react';
+import { RefreshCw, Mail, Phone, ChevronLeft, ChevronRight, X, MessageSquare, User, Calendar, Trash2 } from 'lucide-react';
 import { contactInfoApi, type ContactMessage } from '../lib/api';
 import { LoadingSkeleton } from './LoadingSkeleton';
 import { useToastContext } from '../context/ToastContext';
@@ -17,6 +17,9 @@ export const ContactMessagesTable = () => {
 
   const [selected, setSelected] = useState<ContactMessage | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const load = useCallback(async (targetPage: number) => {
     setLoading(true);
@@ -44,6 +47,26 @@ export const ContactMessagesTable = () => {
       // silently keep the list version
     } finally {
       setDetailLoading(false);
+    }
+  };
+
+  const confirmDelete = (id: string) => setDeletingId(id);
+  const cancelDelete = () => setDeletingId(null);
+
+  const handleDelete = async () => {
+    if (!deletingId) return;
+    setDeleteLoading(true);
+    try {
+      await contactInfoApi.delete(deletingId);
+      setMessages((prev) => prev.filter((m) => m.id !== deletingId));
+      if (selected?.id === deletingId) setSelected(null);
+      setTotal((t) => t - 1);
+      show('Message deleted', 'success');
+      setDeletingId(null);
+    } catch (err) {
+      show(err instanceof Error ? err.message : 'Delete failed', 'error');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -78,7 +101,7 @@ export const ContactMessagesTable = () => {
                     style={{ cursor: 'pointer', flex: 1 }}
                     onClick={() => openDetail(msg)}
                   >
-                    <span className="enquiry-name">{msg.name || 'Anonymous'}</span>
+                    <span className="enquiry-name">{msg.full_name || msg.name || 'Anonymous'}</span>
                     <div className="enquiry-contact">
                       <Mail size={13} />
                       <span>{msg.email}</span>
@@ -95,6 +118,16 @@ export const ContactMessagesTable = () => {
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', minWidth: 72 }}>
                       {msg.created_at ? new Date(msg.created_at).toLocaleDateString() : '—'}
                     </span>
+                    <button
+                      className="icon-btn-danger"
+                      title="Delete message"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        confirmDelete(msg.id);
+                      }}
+                    >
+                      <Trash2 size={15} />
+                    </button>
                   </div>
                 </div>
 
@@ -154,7 +187,7 @@ export const ContactMessagesTable = () => {
                 <div className="drawer-section">
                   <div className="drawer-meta-row">
                     <User size={15} />
-                    <strong>{selected.name || 'Anonymous'}</strong>
+                    <strong>{selected.full_name || selected.name || 'Anonymous'}</strong>
                   </div>
                   <div className="drawer-meta-row">
                     <Mail size={15} />
@@ -183,8 +216,40 @@ export const ContactMessagesTable = () => {
                   </div>
                   <p className="drawer-message">{selected.message}</p>
                 </div>
+
+                <div className="drawer-section" style={{ marginTop: '1.5rem' }}>
+                  <button
+                    className="btn-danger"
+                    style={{ width: '100%', display: 'flex', gap: '0.5rem', justifyContent: 'center' }}
+                    onClick={() => {
+                      setSelected(null);
+                      confirmDelete(selected.id);
+                    }}
+                  >
+                    <Trash2 size={15} />
+                    Delete Message
+                  </button>
+                </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {deletingId && (
+        <div className="modal-overlay" onClick={cancelDelete}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <h3>Delete Message?</h3>
+            <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+              This action cannot be undone. The message will be permanently removed.
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem', justifyContent: 'flex-end' }}>
+              <button className="btn-secondary" onClick={cancelDelete} disabled={deleteLoading}>
+                Cancel
+              </button>
+              <button className="btn-danger" onClick={handleDelete} disabled={deleteLoading}>
+                {deleteLoading ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
           </div>
         </div>
       )}

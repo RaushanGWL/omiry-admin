@@ -455,7 +455,8 @@ export const heroApi = {
 
 export interface Enquiry {
   id: string;
-  name: string;
+  name?: string;
+  full_name?: string;
   email: string;
   phone?: string;
   subject?: string;
@@ -526,14 +527,17 @@ export const enquiriesApi = {
 
 export interface ContactMessage {
   id: string;
-  name: string;
+  name?: string;
+  full_name?: string;
   email: string;
   phone?: string;
   mobile?: string;
   phone_number?: string;
   mobile_number?: string;
+  subject?: string;
   message: string;
   created_at?: string;
+  updated_at?: string;
 }
 
 export interface ContactMessagesListResponse {
@@ -559,6 +563,13 @@ export const contactInfoApi = {
   /** Fetch a single contact message by ID */
   getById: (id: string): Promise<ContactMessage> =>
     apiSingle<ContactMessage>('/functions/v1/contact-info', {
+      params: { id },
+    }),
+
+  /** Delete a contact message by ID */
+  delete: (id: string): Promise<void> =>
+    apiFetch<void>('/functions/v1/contact-info', {
+      method: 'DELETE',
       params: { id },
     }),
 };
