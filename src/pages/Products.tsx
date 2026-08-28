@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, type FormEvent } from 'react';
-import { Plus, Pencil, Trash2, RefreshCw, Upload, X, Image } from 'lucide-react';
+import { Plus, Pencil, Trash2, RefreshCw, Upload, X, Image, ChevronLeft, ChevronRight } from 'lucide-react';
 import { productsApi, type Product, type ProductPayload } from '../lib/api';
 import { Modal } from '../components/Modal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -47,6 +47,11 @@ export const Products = () => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ProductPayload>(emptyForm());
@@ -63,18 +68,17 @@ export const Products = () => {
     });
   };
 
-  const load = async () => {
+  const load = async (targetPage: number = page) => {
     setLoading(true);
     try {
-      // Assuming collectionsApi is added/available or just fetching products for now.
-      // If collectionsApi is exported in api.ts, we can fetch it, else we fetch products.
-      // We will import collectionsApi below.
       const { collectionsApi } = await import('../lib/api');
-      const [data, colls] = await Promise.all([
-        productsApi.list(),
+      const [res, colls] = await Promise.all([
+        productsApi.listPaginated(targetPage, 20),
         collectionsApi.list().catch(() => [])
       ]);
-      setProducts(data);
+      setProducts(res.data);
+      setTotalPages(res.pagination.total_pages || 1);
+      setTotal(res.pagination.total || res.data.length);
       setCollections(colls);
     } catch (err) {
       show(err instanceof Error ? err.message : 'Failed to load products', 'error');
@@ -83,7 +87,7 @@ export const Products = () => {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(page); }, [page]);
 
   const openAdd = () => {
     setEditingId(null);
@@ -181,7 +185,7 @@ export const Products = () => {
         show('Product created successfully', 'success');
       }
       setModalOpen(false);
-      await load();
+      await load(page);
     } catch (err) {
       show(err instanceof Error ? err.message : 'Save failed', 'error');
     } finally {
@@ -272,11 +276,11 @@ export const Products = () => {
         <div>
           <h2>Products Management</h2>
           <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-            {products.length} product{products.length !== 1 ? 's' : ''} total
+            {total} product{total !== 1 ? 's' : ''} total
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button className="btn-secondary icon-btn-sm" onClick={load} title="Refresh">
+          <button className="btn-secondary icon-btn-sm" onClick={() => load(page)} title="Refresh">
             <RefreshCw size={16} />
           </button>
           <button className="btn-primary" id="add-product-btn" onClick={openAdd}>
@@ -387,6 +391,29 @@ export const Products = () => {
           </table>
         )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="pagination-bar" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginTop: '1rem' }}>
+          <button
+            className="btn-secondary icon-btn-sm"
+            disabled={page <= 1 || loading}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+            Page {page} of {totalPages}
+          </span>
+          <button
+            className="btn-secondary icon-btn-sm"
+            disabled={page >= totalPages || loading}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      )}
 
       {/* Add / Edit Modal */}
       <Modal

@@ -188,9 +188,27 @@ export interface ProductPayload {
   authenticity?: string;
 }
 
+export interface ProductsListResponse {
+  data: Product[];
+  pagination: { page: number; limit: number; total: number; total_pages: number };
+}
+
 export const productsApi = {
   list: (): Promise<Product[]> =>
     apiList<Product>('/functions/v1/products', { all: 'true' }),
+
+  listPaginated: async (
+    page: number = 1,
+    limit: number = 20
+  ): Promise<ProductsListResponse> => {
+    const res = await apiFetch<ApiResponse<Product[]>>('/functions/v1/products', {
+      params: { page: String(page), limit: String(limit) },
+    });
+    return {
+      data: Array.isArray(res.data) ? res.data : [],
+      pagination: res.pagination ?? { page, limit, total: 0, total_pages: 0 },
+    };
+  },
 
   /** Full create — sends multipart/form-data with image files */
   create: (data: FormData): Promise<Product> =>
