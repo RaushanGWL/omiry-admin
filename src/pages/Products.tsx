@@ -623,12 +623,12 @@ export const Products = () => {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">Weight</label>
               <input
                 className="form-control"
-                value={form.weight}
+                value={form.weight || ''}
                 onChange={(e) => setField('weight', e.target.value)}
                 placeholder="e.g. 6.2 kg"
               />
@@ -637,9 +637,30 @@ export const Products = () => {
               <label className="form-label">Authenticity</label>
               <input
                 className="form-control"
-                value={form.authenticity}
+                value={form.authenticity || ''}
                 onChange={(e) => setField('authenticity', e.target.value)}
                 placeholder="e.g. Includes Certificate of Authenticity"
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Rating</label>
+              <input
+                className="form-control"
+                value={form.rating || ''}
+                onChange={(e) => setField('rating', e.target.value)}
+                placeholder="e.g. 4.8"
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">No of Person</label>
+              <input
+                className="form-control"
+                value={form.no_of_person || ''}
+                onChange={(e) => setField('no_of_person', e.target.value)}
+                placeholder="e.g. 100"
               />
             </div>
           </div>

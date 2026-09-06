@@ -19,6 +19,9 @@ const emptyForm = (): BlogPayload => ({
   author: '',
   date: '',
   status: 'draft',
+  seo_title: '',
+  seo_description: '',
+  seo_schema_markup: '',
 });
 
 function slugify(str: string) {
@@ -80,6 +83,9 @@ export const Blogs = () => {
       author: b.author || '',
       date: b.date || '',
       status: b.status,
+      seo_title: b.seo_title || '',
+      seo_description: b.seo_description || '',
+      seo_schema_markup: b.seo_schema_markup || '',
     });
     if (imageFile) URL.revokeObjectURL(imagePreview);
     setImageFile(null);
@@ -110,6 +116,9 @@ export const Blogs = () => {
           date: form.date,
           status: form.status,
           cover_image_url: coverImageUrl,
+          seo_title: form.seo_title,
+          seo_description: form.seo_description,
+          seo_schema_markup: form.seo_schema_markup,
         };
         const updated = await blogsApi.update(
           editingId,
@@ -130,6 +139,9 @@ export const Blogs = () => {
           date: form.date,
           status: form.status,
           cover_image_url: coverImageUrl,
+          seo_title: form.seo_title,
+          seo_description: form.seo_description,
+          seo_schema_markup: form.seo_schema_markup,
         };
         const created = await blogsApi.create(payload);
         setBlogs((prev) => [created, ...prev]);
@@ -422,6 +434,45 @@ export const Blogs = () => {
             </small>
           </div>
 
+          <div style={{ background: '#fafafa', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '1.25rem', marginBottom: '1.5rem' }}>
+            <h4 style={{ marginTop: 0, marginBottom: '1rem', color: 'var(--text-primary)' }}>SEO Settings</h4>
+            
+            <div className="form-group">
+              <label className="form-label">SEO Title</label>
+              <input
+                className="form-control"
+                value={form.seo_title || ''}
+                onChange={(e) => setField('seo_title', e.target.value)}
+                placeholder="Custom SEO Title (defaults to blog title)"
+                maxLength={80}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">SEO Description</label>
+              <textarea
+                className="form-control"
+                value={form.seo_description || ''}
+                onChange={(e) => setField('seo_description', e.target.value)}
+                placeholder="Brief description for search engines..."
+                rows={2}
+                maxLength={160}
+              />
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">SEO Schema Markup (JSON-LD)</label>
+              <textarea
+                className="form-control"
+                value={form.seo_schema_markup || ''}
+                onChange={(e) => setField('seo_schema_markup', e.target.value)}
+                placeholder={'{\n  "@context": "https://schema.org",\n  "@type": "BlogPosting",\n  "headline": "..."\n}'}
+                rows={4}
+                style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}
+              />
+            </div>
+          </div>
+
           <div className="form-grid-2">
             <div className="form-group">
               <label className="form-label">Category</label>
@@ -503,17 +554,19 @@ export const Blogs = () => {
             </div>
           </div>
 
-          <div className="form-group" style={{ paddingBottom: '40px' }}>
+          <div className="form-group" style={{ paddingBottom: '10px' }}>
             <label className="form-label">Content</label>
             <Editor
               value={form.content}
               onChange={(e) => setField('content', e.target.value)}
-              containerProps={{ style: { height: '300px', overflowY: 'auto' } }}
+              containerProps={{ style: { height: '200px', overflowY: 'auto' } }}
             />
           </div>
 
+
+
           {editingId && (
-            <div className="form-group" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+            <div className="form-group" style={{ borderTop: '1px solid #e5e7eb', paddingTop: '1rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <label className="form-label" style={{ marginBottom: 0 }}>Blog FAQs</label>

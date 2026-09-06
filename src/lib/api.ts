@@ -166,6 +166,8 @@ export interface Product {
   dimensions?: string;
   weight?: string;
   authenticity?: string;
+  rating?: string;
+  no_of_person?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -186,6 +188,8 @@ export interface ProductPayload {
   dimensions?: string;
   weight?: string;
   authenticity?: string;
+  rating?: string;
+  no_of_person?: string;
 }
 
 export interface ProductsListResponse {
@@ -377,6 +381,9 @@ export interface Blog {
   author?: string;
   date?: string;
   status: 'draft' | 'published';
+  seo_title?: string;
+  seo_description?: string;
+  seo_schema_markup?: string;
   created_at?: string;
   updated_at?: string;
 }

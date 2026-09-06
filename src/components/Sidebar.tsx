@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Package, FolderTree, FileText, MessageSquare, Users, Image, HelpCircle } from 'lucide-react';
+import { LayoutDashboard, Package, FolderTree, FileText, MessageSquare, Users, Image, HelpCircle, Search } from 'lucide-react';
 import './Sidebar.css';
 
 const navItems = [
@@ -11,6 +11,7 @@ const navItems = [
   { path: '/customers', label: 'Customers', icon: Users },
   { path: '/hero', label: 'Hero Section', icon: Image },
   { path: '/faqs', label: 'FAQs (Home Page)', icon: HelpCircle },
+  { path: '/seo', label: 'SEO', icon: Search },
 ];
 
 export const Sidebar = () => {

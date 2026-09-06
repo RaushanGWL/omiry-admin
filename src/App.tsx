@@ -11,6 +11,7 @@ import { Enquiries } from './pages/Enquiries';
 import { Customers } from './pages/Customers';
 import { HeroSection } from './pages/HeroSection';
 import { Faqs } from './pages/Faqs';
+import { Seo } from './pages/Seo';
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
               <Route path="customers" element={<Customers />} />
               <Route path="hero" element={<HeroSection />} />
               <Route path="faqs" element={<Faqs />} />
+              <Route path="seo" element={<Seo />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
