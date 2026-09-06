@@ -85,7 +85,9 @@ export const Blogs = () => {
       status: b.status,
       seo_title: b.seo_title || '',
       seo_description: b.seo_description || '',
-      seo_schema_markup: b.seo_schema_markup || '',
+      seo_schema_markup: typeof b.seo_schema_markup === 'object' && b.seo_schema_markup !== null 
+        ? JSON.stringify(b.seo_schema_markup, null, 2) 
+        : (b.seo_schema_markup || ''),
     });
     if (imageFile) URL.revokeObjectURL(imagePreview);
     setImageFile(null);
@@ -103,9 +105,21 @@ export const Blogs = () => {
         show('Uploading image…', 'success');
         coverImageUrl = await storageApi.uploadBlogImage(imageFile);
       }
+      let schemaMarkupObj = null;
+      if (typeof form.seo_schema_markup === 'string' && form.seo_schema_markup.trim()) {
+        try {
+          schemaMarkupObj = JSON.parse(form.seo_schema_markup);
+        } catch (err) {
+          show('Invalid JSON in schema markup', 'error');
+          setSaving(false);
+          return;
+        }
+      } else if (typeof form.seo_schema_markup === 'object') {
+        schemaMarkupObj = form.seo_schema_markup;
+      }
 
       if (editingId) {
-        // ── UPDATE: PATCH only accepts JSON ──────────────────────
+        // ── UPDATE: PATCH with JSON body ──────────────────────────
         const payload: Partial<BlogPayload> = {
           title: form.title,
           slug: form.slug,
@@ -118,7 +132,7 @@ export const Blogs = () => {
           cover_image_url: coverImageUrl,
           seo_title: form.seo_title,
           seo_description: form.seo_description,
-          seo_schema_markup: form.seo_schema_markup,
+          seo_schema_markup: schemaMarkupObj,
         };
         const updated = await blogsApi.update(
           editingId,
@@ -141,7 +155,7 @@ export const Blogs = () => {
           cover_image_url: coverImageUrl,
           seo_title: form.seo_title,
           seo_description: form.seo_description,
-          seo_schema_markup: form.seo_schema_markup,
+          seo_schema_markup: schemaMarkupObj,
         };
         const created = await blogsApi.create(payload);
         setBlogs((prev) => [created, ...prev]);

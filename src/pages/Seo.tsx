@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from 'react';
-import { Save } from 'lucide-react';
+import { useState, useEffect, type FormEvent } from 'react';
+import { Save, Trash2 } from 'lucide-react';
 import { useToastContext } from '../context/ToastContext';
+import { seoApi } from '../lib/api';
 
 // Mock list of pages for now
 const defaultPages = [
@@ -17,29 +18,111 @@ interface SeoData {
   title: string;
   description: string;
   schema_markup: string;
+  isExisting?: boolean;
 }
 
 export const Seo = () => {
   const { show } = useToastContext();
   const [selectedPage, setSelectedPage] = useState(defaultPages[0].id);
   
-  // Mock state to hold data for each page
   const [seoData, setSeoData] = useState<Record<string, SeoData>>({});
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
-  const currentData = seoData[selectedPage] || { title: '', description: '', schema_markup: '' };
+  useEffect(() => {
+    const fetchSeo = async () => {
+      if (seoData[selectedPage]) return; // Already fetched
+      setLoading(true);
+      try {
+        const data = await seoApi.get(selectedPage);
+        if (data && (data.seo_title !== undefined || data.seo_description !== undefined || data.page_key)) {
+          setSeoData((prev) => ({
+            ...prev,
+            [selectedPage]: {
+              title: data.seo_title || '',
+              description: data.seo_description || '',
+              schema_markup: data.seo_schema_markup ? JSON.stringify(data.seo_schema_markup, null, 2) : '',
+              isExisting: true
+            }
+          }));
+        } else {
+          setSeoData((prev) => ({
+            ...prev,
+            [selectedPage]: { title: '', description: '', schema_markup: '', isExisting: false }
+          }));
+        }
+      } catch (err) {
+        // Typically fails with 404 if not found, that's fine
+        setSeoData((prev) => ({
+          ...prev,
+          [selectedPage]: { title: '', description: '', schema_markup: '', isExisting: false }
+        }));
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSeo();
+  }, [selectedPage, seoData]);
+
+  const currentData = seoData[selectedPage] || { title: '', description: '', schema_markup: '', isExisting: false };
 
   const handleSave = async (e: FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      // Simulate API call for now since we don't have the API yet
-      await new Promise(resolve => setTimeout(resolve, 500));
+      let schemaMarkupObj = null;
+      if (currentData.schema_markup) {
+        try {
+          schemaMarkupObj = JSON.parse(currentData.schema_markup);
+        } catch (err) {
+          show('Invalid JSON in schema markup', 'error');
+          setSaving(false);
+          return;
+        }
+      }
+      
+      const payload = {
+        page_key: selectedPage,
+        seo_title: currentData.title,
+        seo_description: currentData.description,
+        seo_schema_markup: schemaMarkupObj
+      };
+
+      if (currentData.isExisting) {
+        await seoApi.update(selectedPage, payload);
+      } else {
+        await seoApi.upsert(payload);
+        setSeoData(prev => ({
+          ...prev,
+          [selectedPage]: { ...prev[selectedPage], isExisting: true }
+        }));
+      }
+      
       show(`SEO settings for ${defaultPages.find(p => p.id === selectedPage)?.name} saved successfully`, 'success');
-    } catch (err) {
-      show('Save failed', 'error');
+    } catch (err: any) {
+      show(err.message || 'Save failed', 'error');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!currentData.isExisting) return;
+    if (!window.confirm(`Are you sure you want to delete SEO data for ${defaultPages.find(p => p.id === selectedPage)?.name}?`)) return;
+    
+    setDeleting(true);
+    try {
+      await seoApi.delete(selectedPage);
+      setSeoData(prev => ({
+        ...prev,
+        [selectedPage]: { title: '', description: '', schema_markup: '', isExisting: false }
+      }));
+      show('SEO data deleted successfully', 'success');
+    } catch (err: any) {
+      show(err.message || 'Delete failed', 'error');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -67,7 +150,7 @@ export const Seo = () => {
       <div style={{ display: 'grid', gridTemplateColumns: '250px 1fr', gap: '1.5rem', alignItems: 'start' }}>
         {/* Sidebar for Pages */}
         <div className="card" style={{ padding: '0.5rem' }}>
-          <h3 style={{ fontSize: '0.9rem', padding: '0.5rem 1rem', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)', marginBottom: '0.5rem' }}>
+          <h3 style={{ fontSize: '0.9rem', padding: '0.5rem 1rem', color: 'var(--text-secondary)', borderBottom: '1px solid #f0f0f0', marginBottom: '0.5rem' }}>
             Pages
           </h3>
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
@@ -98,7 +181,12 @@ export const Seo = () => {
         </div>
 
         {/* Form for selected page */}
-        <div className="card">
+        <div className="card" style={{ position: 'relative' }}>
+          {loading && (
+            <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.7)', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>Loading...</span>
+            </div>
+          )}
           <h3 style={{ marginBottom: '1.5rem', fontSize: '1.1rem' }}>
             {defaultPages.find(p => p.id === selectedPage)?.name} SEO Settings
           </h3>
@@ -139,11 +227,22 @@ export const Seo = () => {
               </p>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2rem', gap: '1rem' }}>
+              {currentData.isExisting && (
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={saving || loading || deleting}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5', padding: '0.5rem 1rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 500 }}
+                >
+                  <Trash2 size={18} />
+                  {deleting ? 'Deleting…' : 'Delete Data'}
+                </button>
+              )}
               <button
                 type="submit"
                 className="btn-primary"
-                disabled={saving}
+                disabled={saving || loading || deleting}
               >
                 <Save size={18} />
                 {saving ? 'Saving…' : 'Save Changes'}

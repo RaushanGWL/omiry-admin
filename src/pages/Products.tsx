@@ -33,6 +33,8 @@ const emptyForm = (): ProductPayload => ({
   dimensions: '',
   weight: '',
   authenticity: '',
+  rating: '',
+  rating_count: '',
 });
 
 function slugify(str: string) {
@@ -116,6 +118,8 @@ export const Products = () => {
       dimensions: p.dimensions ?? '',
       weight: p.weight ?? '',
       authenticity: p.authenticity ?? '',
+      rating: p.rating ?? '',
+      rating_count: p.rating_count ?? '',
     });
     revokeBlobUrls(imageEntries);
     // Existing server images — extract ID if available
@@ -148,6 +152,8 @@ export const Products = () => {
     if (form.dimensions) fd.append('dimensions', form.dimensions);
     if (form.weight) fd.append('weight', form.weight);
     if (form.authenticity) fd.append('authenticity', form.authenticity);
+    if (form.rating) fd.append('rating', form.rating);
+    if (form.rating_count) fd.append('rating_count', form.rating_count);
     imageEntries.forEach((entry) => {
       if (entry.file) {
         fd.append('images', entry.file);
@@ -655,11 +661,11 @@ export const Products = () => {
               />
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">No of Person</label>
+              <label className="form-label">Rating Count</label>
               <input
                 className="form-control"
-                value={form.no_of_person || ''}
-                onChange={(e) => setField('no_of_person', e.target.value)}
+                value={form.rating_count || ''}
+                onChange={(e) => setField('rating_count', e.target.value)}
                 placeholder="e.g. 100"
               />
             </div>

@@ -167,7 +167,7 @@ export interface Product {
   weight?: string;
   authenticity?: string;
   rating?: string;
-  no_of_person?: string;
+  rating_count?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -189,7 +189,7 @@ export interface ProductPayload {
   weight?: string;
   authenticity?: string;
   rating?: string;
-  no_of_person?: string;
+  rating_count?: string;
 }
 
 export interface ProductsListResponse {
@@ -383,7 +383,7 @@ export interface Blog {
   status: 'draft' | 'published';
   seo_title?: string;
   seo_description?: string;
-  seo_schema_markup?: string;
+  seo_schema_markup?: object | string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -658,8 +658,43 @@ export const faqsApi = {
     apiSingle<Faq[]>('/rest/v1/faqs', {
       method: 'PATCH',
       body: JSON.stringify({ is_active: action === 'publish' }),
-      params: { id: `eq.${id}` },
       headers: { Prefer: 'return=representation' }
     }).then(res => (Array.isArray(res) ? res[0] : res)),
+};
+
+// ─── SEO API ──────────────────────────────────────────────────────────────────
+
+export interface SeoPayload {
+  page_key: string;
+  seo_title: string;
+  seo_description: string;
+  seo_schema_markup: object | string | null;
+}
+
+export const seoApi = {
+  get: (page_key: string): Promise<SeoPayload> =>
+    apiSingle<SeoPayload>('/functions/v1/omriy-seo', {
+      method: 'GET',
+      params: { page_key },
+    }),
+
+  upsert: (data: SeoPayload): Promise<SeoPayload> =>
+    apiSingle<SeoPayload>('/functions/v1/omriy-seo', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (page_key: string, data: SeoPayload): Promise<SeoPayload> =>
+    apiSingle<SeoPayload>('/functions/v1/omriy-seo', {
+      method: 'PUT',
+      params: { page_key },
+      body: JSON.stringify(data),
+    }),
+
+  delete: (page_key: string): Promise<void> =>
+    apiFetch<void>('/functions/v1/omriy-seo', {
+      method: 'DELETE',
+      params: { page_key },
+    }),
 };
 

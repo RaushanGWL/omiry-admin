@@ -103,8 +103,13 @@ export const Dashboard = () => {
       )}
 
       <div className="card">
-        <div className="card-header">
-          <h3>Recent Enquiries</h3>
+        <div 
+          className="card-header" 
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+          onClick={() => navigate('/enquiries')}
+        >
+          <h3 style={{ margin: 0 }}>Recent Enquiries</h3>
+          <span style={{ fontSize: '0.85rem', color: 'var(--primary-color)', fontWeight: 500 }}>View All &rarr;</span>
         </div>
         {loading ? (
           <LoadingSkeleton rows={4} />
