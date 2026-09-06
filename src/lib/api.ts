@@ -658,6 +658,7 @@ export const faqsApi = {
     apiSingle<Faq[]>('/rest/v1/faqs', {
       method: 'PATCH',
       body: JSON.stringify({ is_active: action === 'publish' }),
+      params: { id: `eq.${id}` },
       headers: { Prefer: 'return=representation' }
     }).then(res => (Array.isArray(res) ? res[0] : res)),
 };

@@ -478,7 +478,7 @@ export const Blogs = () => {
               <label className="form-label">SEO Schema Markup (JSON-LD)</label>
               <textarea
                 className="form-control"
-                value={form.seo_schema_markup || ''}
+                value={typeof form.seo_schema_markup === 'object' && form.seo_schema_markup !== null ? JSON.stringify(form.seo_schema_markup, null, 2) : (form.seo_schema_markup as string || '')}
                 onChange={(e) => setField('seo_schema_markup', e.target.value)}
                 placeholder={'{\n  "@context": "https://schema.org",\n  "@type": "BlogPosting",\n  "headline": "..."\n}'}
                 rows={4}
